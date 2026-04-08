@@ -14,22 +14,47 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Setup SSH
+      - name: Check secrets presence
+        shell: bash
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
+          [ -n "$EC2_HOST" ] && echo "EC2_HOST ok" || (echo "EC2_HOST missing" && exit 1)
+          [ -n "$EC2_USER" ] && echo "EC2_USER ok" || (echo "EC2_USER missing" && exit 1)
+          [ -n "$EC2_SSH_KEY" ] && echo "EC2_SSH_KEY ok" || (echo "EC2_SSH_KEY missing" && exit 1)
+
+      - name: Setup SSH
+        shell: bash
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          set -e
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_ed25519
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
 
       - name: Upload website files
+        shell: bash
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
         run: |
           rsync -avz --delete \
             -e "ssh -i ~/.ssh/id_ed25519" \
-            ./site/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/site/
+            ./site/ "$EC2_USER@$EC2_HOST:/tmp/site/"
 
       - name: Publish to nginx web root
+        shell: bash
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
         run: |
-          ssh -i ~/.ssh/id_ed25519 ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
+          ssh -i ~/.ssh/id_ed25519 "$EC2_USER@$EC2_HOST" '
             sudo mkdir -p /var/www/html
             sudo cp -r /tmp/site/* /var/www/html/
             sudo nginx -t
