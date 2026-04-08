@@ -29,6 +29,9 @@ jobs:
             sudo systemctl enable nginx
             sudo systemctl start nginx
           '
+      - name: Test SSH
+        run: |
+          ssh -i ~/.ssh/id_ed25519 ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "hostname && whoami"
 
       - name: Upload website files
         run: |
